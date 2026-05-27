@@ -1,4 +1,3 @@
-// app/page.tsx
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -13,12 +12,10 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState<'inventory' | 'bins' | 'orders'>('inventory')
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
   
-  // Form states
   const [newProduct, setNewProduct] = useState({ sku: '', description: '', quantity: '', bin: '' })
   const [newBin, setNewBin] = useState({ bin_code: '', zone: '' })
   const [newOrder, setNewOrder] = useState({ order_id: '', customer: '', type: 'Outbound', sku: '', quantity: '', bin: '' })
   
-  // AI States
   const [aiSuggestions, setAiSuggestions] = useState<any>(null)
   const [aiLoading, setAiLoading] = useState(false)
   const [showAiPanel, setShowAiPanel] = useState(true)
@@ -157,7 +154,6 @@ export default function Home() {
     }
   }
   
-  // AI Functions
   async function getAiBinSuggestion() {
     if (!newOrder.sku || !newOrder.order_id) {
       showMessage('error', 'Please enter SKU and Order ID first')
@@ -200,7 +196,6 @@ export default function Home() {
       }
       
     } catch (error) {
-      console.error('AI suggestion error:', error)
       setAiSuggestions({ error: 'Failed to get AI suggestion' })
     } finally {
       setAiLoading(false)
@@ -357,7 +352,6 @@ export default function Home() {
               <button onClick={addProduct} className="mt-3 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium">+ Add Product</button>
             </div>
             
-            {/* AI Inventory Audit Button */}
             <div className="bg-gradient-to-r from-emerald-50 to-teal-50 rounded-lg border border-emerald-200 p-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -435,56 +429,48 @@ export default function Home() {
                 <input type="text" placeholder="Order ID" className="border border-gray-300 rounded-lg px-3 py-2 text-sm" value={newOrder.order_id} onChange={(e) => setNewOrder({ ...newOrder, order_id: e.target.value })} />
                 <input type="text" placeholder="Customer" className="border border-gray-300 rounded-lg px-3 py-2 text-sm" value={newOrder.customer} onChange={(e) => setNewOrder({ ...newOrder, customer: e.target.value })} />
                 <select className="border border-gray-300 rounded-lg px-3 py-2 text-sm" value={newOrder.type} onChange={(e) => setNewOrder({ ...newOrder, type: e.target.value as any })}>
-                  <option value="Inbound">📥 Inbound</option><option value="Outbound">📤 Outbound</option><option value="Internal">🔄 Internal</option>
+                  <option value="Inbound">📥 Inbound</option>
+                  <option value="Outbound">📤 Outbound</option>
+                  <option value="Internal">🔄 Internal</option>
                 </select>
                 <input type="text" placeholder="SKU" className="border border-gray-300 rounded-lg px-3 py-2 text-sm" value={newOrder.sku} onChange={(e) => setNewOrder({ ...newOrder, sku: e.target.value })} />
                 <input type="number" placeholder="Quantity" className="border border-gray-300 rounded-lg px-3 py-2 text-sm" value={newOrder.quantity} onChange={(e) => setNewOrder({ ...newOrder, quantity: e.target.value })} />
                 <select className="border border-gray-300 rounded-lg px-3 py-2 text-sm" value={newOrder.bin} onChange={(e) => setNewOrder({ ...newOrder, bin: e.target.value })}>
-                  <option value="">Select Bin</option>{bins.map(bin => (<option key={bin.id} value={bin.bin_code}>{bin.bin_code}</option>))}
+                  <option value="">Select Bin</option>
+                  {bins.map(bin => (<option key={bin.id} value={bin.bin_code}>{bin.bin_code}</option>))}
                 </select>
               </div>
-              <button onClick={addOrder} className="mt-3 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium">+ Create Order</button>
-            </div>
-            
-            {/* AI Smart Bin Suggestion Panel */}
-            <div className="p-4 bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg border border-purple-200">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <Sparkles className="w-5 h-5 text-purple-600" />
-                  <h3 className="font-semibold text-purple-900">AI Smart Bin Picker</h3>
-                  <span className="text-xs bg-purple-200 text-purple-800 px-2 py-0.5 rounded-full">Gemini 1.5 Flash</span>
-                </div>
-                <button onClick={() => setShowAiPanel(!showAiPanel)} className="text-xs text-purple-600 hover:text-purple-800">{showAiPanel ? 'Hide' : 'Show'}</button>
+              <div className="flex gap-3 mt-3">
+                <button onClick={addOrder} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium">+ Create Order</button>
+                
+                {/* AI Smart Bin Picker Button */}
+                {newOrder.sku && newOrder.order_id && newOrder.type === 'Outbound' && (
+                  <button onClick={getAiBinSuggestion} disabled={aiLoading} className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2">
+                    <Sparkles className="w-4 h-4" />
+                    {aiLoading ? 'Analyzing...' : '✨ Get AI Bin Recommendation'}
+                  </button>
+                )}
               </div>
               
-              {showAiPanel && (
-                <div className="space-y-3">
-                  <div className="text-sm text-gray-600">
-                    Let AI recommend the optimal bin based on stock availability, pick efficiency, and FIFO compliance.
+              {/* AI Recommendation Display */}
+              {aiSuggestions && !aiSuggestions.error && (
+                <div className="mt-3 bg-purple-50 rounded-lg p-3 border border-purple-200">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-semibold text-purple-900">🤖 AI Recommendation</span>
+                    <span className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full">
+                      Confidence: {Math.round((aiSuggestions.confidenceScore || 0.8) * 100)}%
+                    </span>
                   </div>
-                  
-                  {newOrder.sku && newOrder.order_id && newOrder.type === 'Outbound' && (
-                    <button onClick={getAiBinSuggestion} disabled={aiLoading} className="w-full bg-purple-600 hover:bg-purple-700 text-white py-2 rounded-lg text-sm font-medium transition flex items-center justify-center gap-2">
-                      {aiLoading ? <>⏳ Analyzing...</> : <><Sparkles className="w-4 h-4" /> Get AI Bin Recommendation</>}
-                    </button>
+                  <div className="text-2xl font-mono font-bold text-purple-700 mt-1">{aiSuggestions.recommendedBin}</div>
+                  <p className="text-xs text-gray-600 mt-1">{aiSuggestions.reason}</p>
+                  {aiSuggestions.estimatedPickTime && (
+                    <p className="text-xs text-gray-500 mt-1">⏱️ Est. pick time: {aiSuggestions.estimatedPickTime} seconds</p>
                   )}
-                  
-                  {aiSuggestions && !aiSuggestions.error && (
-                    <div className="bg-white rounded-lg p-3 border border-purple-100 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-semibold text-purple-900">🤖 AI Recommendation</span>
-                        <span className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full">Confidence: {Math.round((aiSuggestions.confidenceScore || 0.8) * 100)}%</span>
-                      </div>
-                      <div className="text-2xl font-mono font-bold text-purple-700">{aiSuggestions.recommendedBin}</div>
-                      <p className="text-xs text-gray-600">{aiSuggestions.reason}</p>
-                      {aiSuggestions.alternativeBins?.length > 0 && <div className="text-xs text-gray-500">Alternatives: {aiSuggestions.alternativeBins.join(', ')}</div>}
-                      {aiSuggestions.estimatedPickTime && <div className="text-xs text-gray-500">⏱️ Est. pick time: {aiSuggestions.estimatedPickTime} seconds</div>}
-                      {aiSuggestions.pickInstructions && <div className="text-xs bg-yellow-50 p-2 rounded mt-2">📋 {aiSuggestions.pickInstructions}</div>}
-                    </div>
-                  )}
-                  
-                  {aiSuggestions?.error && <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm">❌ {aiSuggestions.error}</div>}
                 </div>
+              )}
+              
+              {aiSuggestions?.error && (
+                <div className="mt-3 bg-red-50 text-red-600 p-3 rounded-lg text-sm">❌ {aiSuggestions.error}</div>
               )}
             </div>
             
@@ -495,24 +481,29 @@ export default function Home() {
                   <Zap className="w-5 h-5 text-green-600" />
                   <h3 className="font-semibold text-green-900">AI Wave Optimization</h3>
                 </div>
-                <button onClick={optimizePickingWave} disabled={aiLoading} className="text-xs bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded-lg transition flex items-center gap-1">
+                <button onClick={optimizePickingWave} disabled={aiLoading} className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-lg text-sm font-medium flex items-center gap-1">
                   <TrendingUp className="w-3 h-3" /> {aiLoading ? 'Optimizing...' : 'Optimize Now'}
                 </button>
               </div>
               
               {pickingOptimization && (
                 <div className="space-y-2">
-                  <div className="flex justify-between text-sm"><span>📊 Total Est. Time:</span><span className="font-mono font-bold">{Math.floor(pickingOptimization.totalEstimatedTime / 60)} min</span></div>
+                  <div className="flex justify-between text-sm bg-white p-2 rounded">
+                    <span>📊 Total Est. Time:</span>
+                    <span className="font-mono font-bold">{Math.floor(pickingOptimization.totalEstimatedTime / 60)} minutes</span>
+                  </div>
                   {pickingOptimization.pickWaves?.map((wave: any, idx: number) => (
-                    <div key={idx} className="bg-white rounded-lg p-2 text-sm">
+                    <div key={idx} className="bg-white rounded-lg p-2 text-sm border border-green-100">
                       <div className="flex items-center justify-between">
                         <span className="font-mono font-bold">{wave.waveId}</span>
                         <span className={`text-xs px-2 py-0.5 rounded-full ${wave.priority === 'HIGH' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'}`}>{wave.priority}</span>
                       </div>
-                      <div className="text-xs text-gray-500 mt-1">Orders: {wave.orders?.join(', ')} | Workers: {wave.assignedWorkers}</div>
+                      <div className="text-xs text-gray-500 mt-1">Orders: {wave.orders?.join(', ')}</div>
                     </div>
                   ))}
-                  {pickingOptimization.recommendations && <div className="bg-blue-50 p-2 rounded text-xs">💡 {pickingOptimization.recommendations[0]}</div>}
+                  {pickingOptimization.recommendations && (
+                    <div className="bg-blue-50 p-2 rounded text-xs">💡 {pickingOptimization.recommendations[0]}</div>
+                  )}
                 </div>
               )}
             </div>
@@ -526,8 +517,17 @@ export default function Home() {
               </div>
               
               <div className="flex gap-2">
-                <input type="text" placeholder="e.g., 'Show me low stock items' or 'How to optimize picking?'" className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm" value={chatPrompt} onChange={(e) => setChatPrompt(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && sendChatMessage()} />
-                <button onClick={sendChatMessage} disabled={chatLoading} className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-1"><Send className="w-4 h-4" /> Send</button>
+                <input 
+                  type="text" 
+                  placeholder="e.g., 'Show me low stock items' or 'How to optimize picking?'" 
+                  className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm" 
+                  value={chatPrompt} 
+                  onChange={(e) => setChatPrompt(e.target.value)} 
+                  onKeyPress={(e) => e.key === 'Enter' && sendChatMessage()} 
+                />
+                <button onClick={sendChatMessage} disabled={chatLoading} className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-1">
+                  <Send className="w-4 h-4" /> Send
+                </button>
               </div>
               
               {chatLoading && <div className="mt-2 text-sm text-gray-500 animate-pulse">🤖 AI is thinking...</div>}
