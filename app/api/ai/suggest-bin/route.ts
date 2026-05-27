@@ -3,6 +3,25 @@ import { NextResponse } from 'next/server'
 const GEMINI_API_KEY = 'AIzaSyAi2-btv4IJCSb3o3FGZUviJfnVu7jZZwg'
 const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent'
 
+// Define types
+interface BinStock {
+  bin: string
+  quantity: number
+  sku: string
+  description?: string
+  created_at?: string
+  zone?: string
+}
+
+interface SuggestionResponse {
+  recommendedBin: string
+  reason: string
+  confidenceScore: number
+  alternativeBins: string[]
+  estimatedPickTime: number
+  pickInstructions: string
+}
+
 export async function POST(request: Request) {
   try {
     const { sku, quantity, orderId, customer, availableBins, priorityFactors } = await request.json()
@@ -29,7 +48,7 @@ ${JSON.stringify(availableBins, null, 2)}
   "confidenceScore": 0.95,
   "alternativeBins": ["alt_bin_1", "alt_bin_2"],
   "estimatedPickTime": 120,
-  "pickInstructions": "Specific guidance for the picker (e.g., 'Check expiry date', 'Use ladder for top shelf')"
+  "pickInstructions": "Specific guidance for the picker"
 }`
 
     const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
@@ -54,15 +73,21 @@ ${JSON.stringify(availableBins, null, 2)}
 
     const aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}'
     
-    let suggestion
+    let suggestion: SuggestionResponse
     try {
-      suggestion = JSON.parse(aiResponse)
+      suggestion = JSON.parse(aiResponse) as SuggestionResponse
     } catch {
+      // Provide default suggestion with proper typing
+      const defaultBin = (availableBins && availableBins.length > 0) ? availableBins[0].bin : 'N/A'
+      const altBins: string[] = (availableBins && availableBins.length > 1) 
+        ? availableBins.slice(1, 3).map((b: BinStock) => b.bin) 
+        : []
+      
       suggestion = {
-        recommendedBin: availableBins[0]?.bin || 'N/A',
+        recommendedBin: defaultBin,
         reason: 'AI response parsing failed - using first available bin',
         confidenceScore: 0.5,
-        alternativeBins: availableBins.slice(1, 3).map(b => b.bin),
+        alternativeBins: altBins,
         estimatedPickTime: 180,
         pickInstructions: 'Standard pick procedure'
       }
@@ -72,6 +97,6 @@ ${JSON.stringify(availableBins, null, 2)}
 
   } catch (error) {
     console.error('AI Bin Suggestion Error:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return NextResponse.json({ error: 'Internal server error: ' + String(error) }, { status: 500 })
   }
 }
