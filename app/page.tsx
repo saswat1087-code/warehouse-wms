@@ -470,4 +470,99 @@ export default function Home() {
                   )}
                   
                   {aiSuggestions && !aiSuggestions.error && (
-                    <div className="bg-white rounded-lg p-3 border border-purple-100 space-y-
+                    <div className="bg-white rounded-lg p-3 border border-purple-100 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-semibold text-purple-900">🤖 AI Recommendation</span>
+                        <span className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full">Confidence: {Math.round((aiSuggestions.confidenceScore || 0.8) * 100)}%</span>
+                      </div>
+                      <div className="text-2xl font-mono font-bold text-purple-700">{aiSuggestions.recommendedBin}</div>
+                      <p className="text-xs text-gray-600">{aiSuggestions.reason}</p>
+                      {aiSuggestions.alternativeBins?.length > 0 && <div className="text-xs text-gray-500">Alternatives: {aiSuggestions.alternativeBins.join(', ')}</div>}
+                      {aiSuggestions.estimatedPickTime && <div className="text-xs text-gray-500">⏱️ Est. pick time: {aiSuggestions.estimatedPickTime} seconds</div>}
+                      {aiSuggestions.pickInstructions && <div className="text-xs bg-yellow-50 p-2 rounded mt-2">📋 {aiSuggestions.pickInstructions}</div>}
+                    </div>
+                  )}
+                  
+                  {aiSuggestions?.error && <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm">❌ {aiSuggestions.error}</div>}
+                </div>
+              )}
+            </div>
+            
+            {/* AI Wave Optimization Panel */}
+            <div className="p-4 bg-gradient-to-r from-green-50 to-teal-50 rounded-lg border border-green-200">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Zap className="w-5 h-5 text-green-600" />
+                  <h3 className="font-semibold text-green-900">AI Wave Optimization</h3>
+                </div>
+                <button onClick={optimizePickingWave} disabled={aiLoading} className="text-xs bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded-lg transition flex items-center gap-1">
+                  <TrendingUp className="w-3 h-3" /> {aiLoading ? 'Optimizing...' : 'Optimize Now'}
+                </button>
+              </div>
+              
+              {pickingOptimization && (
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm"><span>📊 Total Est. Time:</span><span className="font-mono font-bold">{Math.floor(pickingOptimization.totalEstimatedTime / 60)} min</span></div>
+                  {pickingOptimization.pickWaves?.map((wave: any, idx: number) => (
+                    <div key={idx} className="bg-white rounded-lg p-2 text-sm">
+                      <div className="flex items-center justify-between">
+                        <span className="font-mono font-bold">{wave.waveId}</span>
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${wave.priority === 'HIGH' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'}`}>{wave.priority}</span>
+                      </div>
+                      <div className="text-xs text-gray-500 mt-1">Orders: {wave.orders?.join(', ')} | Workers: {wave.assignedWorkers}</div>
+                    </div>
+                  ))}
+                  {pickingOptimization.recommendations && <div className="bg-blue-50 p-2 rounded text-xs">💡 {pickingOptimization.recommendations[0]}</div>}
+                </div>
+              )}
+            </div>
+            
+            {/* AI Chat Assistant */}
+            <div className="p-4 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-lg border border-indigo-200">
+              <div className="flex items-center gap-2 mb-3">
+                <Mic className="w-5 h-5 text-indigo-600" />
+                <h3 className="font-semibold text-indigo-900">AI Warehouse Assistant</h3>
+                <span className="text-xs bg-indigo-200 text-indigo-800 px-2 py-0.5 rounded-full">Ask me anything</span>
+              </div>
+              
+              <div className="flex gap-2">
+                <input type="text" placeholder="e.g., 'Show me low stock items' or 'How to optimize picking?'" className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm" value={chatPrompt} onChange={(e) => setChatPrompt(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && sendChatMessage()} />
+                <button onClick={sendChatMessage} disabled={chatLoading} className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-1"><Send className="w-4 h-4" /> Send</button>
+              </div>
+              
+              {chatLoading && <div className="mt-2 text-sm text-gray-500 animate-pulse">🤖 AI is thinking...</div>}
+              {chatResponse && (
+                <div className="mt-3 bg-white rounded-lg p-3 border border-indigo-100">
+                  <p className="text-sm text-gray-700">{chatResponse}</p>
+                </div>
+              )}
+            </div>
+            
+            <div className="space-y-2">
+              {orders.map(order => (
+                <div key={order.id} className="bg-white rounded-lg border border-gray-200 p-4">
+                  <div className="flex items-center justify-between flex-wrap gap-3">
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-mono font-bold">{order.order_id}</span>
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${order.type === 'Inbound' ? 'bg-green-100 text-green-800' : order.type === 'Outbound' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'}`}>{order.type}</span>
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${order.status === 'Open' ? 'bg-yellow-100 text-yellow-800' : order.status === 'In Transit' ? 'bg-purple-100 text-purple-800' : 'bg-green-100 text-green-800'}`}>{order.status}</span>
+                      </div>
+                      <div className="text-sm mt-1"><span className="font-medium">{order.customer}</span> - {order.sku} x {order.quantity}</div>
+                      <div className="text-xs text-gray-500 mt-1">Bin: {order.bin}</div>
+                    </div>
+                    <div className="flex gap-2">
+                      {order.status === 'Open' && <button onClick={() => updateOrderStatus(order.order_id, 'In Transit')} className="text-xs bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded">Start Transit</button>}
+                      {order.status === 'In Transit' && <button onClick={() => updateOrderStatus(order.order_id, 'Closed')} className="text-xs bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded">Complete</button>}
+                      <button onClick={() => deleteItem('orders', order.id, order.order_id)} className="text-red-500 hover:text-red-700 text-xs px-3 py-1">Delete</button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
