@@ -7,24 +7,7 @@ export async function POST(request: Request) {
   try {
     const { sku, quantity, orderId, customer, availableBins } = await request.json()
 
-    const prompt = `You are an intelligent warehouse optimization AI. Your task is to suggest the BEST bin location for picking items.
-
-Current Context:
-- Order ID: ${orderId}
-- Customer: ${customer}
-- SKU: ${sku}
-- Quantity Needed: ${quantity}
-
-Available Bins: ${JSON.stringify(availableBins, null, 2)}
-
-Return JSON only:
-{
-  "recommendedBin": "bin_code",
-  "reason": "explanation",
-  "confidenceScore": 0.95,
-  "alternativeBins": [],
-  "estimatedPickTime": 120
-}`
+    const prompt = `You are a warehouse AI. Suggest the best bin for SKU: ${sku}, quantity: ${quantity}. Available bins: ${JSON.stringify(availableBins)}. Return JSON only: {"recommendedBin": "bin_code", "reason": "why", "confidenceScore": 0.9}`
 
     const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
       method: 'POST',
@@ -38,7 +21,7 @@ Return JSON only:
     const data = await response.json()
     
     if (!response.ok) {
-      return NextResponse.json({ error: 'AI service error' }, { status: response.status })
+      return NextResponse.json({ error: 'AI service error: ' + response.status }, { status: response.status })
     }
 
     const aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}'
@@ -47,6 +30,7 @@ Return JSON only:
     return NextResponse.json(suggestion)
 
   } catch (error) {
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    console.error('Error:', error)
+    return NextResponse.json({ error: 'Internal server error: ' + String(error) }, { status: 500 })
   }
 }
