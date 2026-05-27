@@ -1,7 +1,9 @@
+// app/page.tsx
 'use client'
 
 import { useEffect, useState } from 'react'
 import { supabase, Inventory, Bin, Order } from '@/lib/supabase'
+import { Sparkles, Zap, TrendingUp, Mic, Send, BarChart3, AlertCircle } from 'lucide-react'
 
 export default function Home() {
   const [inventory, setInventory] = useState<Inventory[]>([])
@@ -15,11 +17,20 @@ export default function Home() {
   const [newProduct, setNewProduct] = useState({ sku: '', description: '', quantity: '', bin: '' })
   const [newBin, setNewBin] = useState({ bin_code: '', zone: '' })
   const [newOrder, setNewOrder] = useState({ order_id: '', customer: '', type: 'Outbound', sku: '', quantity: '', bin: '' })
+  
+  // AI States
+  const [aiSuggestions, setAiSuggestions] = useState<any>(null)
+  const [aiLoading, setAiLoading] = useState(false)
+  const [showAiPanel, setShowAiPanel] = useState(true)
+  const [pickingOptimization, setPickingOptimization] = useState<any>(null)
+  const [chatPrompt, setChatPrompt] = useState('')
+  const [chatResponse, setChatResponse] = useState('')
+  const [chatLoading, setChatLoading] = useState(false)
+  const [inventoryAudit, setInventoryAudit] = useState<any>(null)
 
   useEffect(() => {
     loadAllData()
     
-    // Real-time subscriptions
     const inventorySub = supabase
       .channel('inventory-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory' }, () => loadInventory())
@@ -128,6 +139,7 @@ export default function Home() {
     else {
       showMessage('success', 'Order created successfully!')
       setNewOrder({ order_id: '', customer: '', type: 'Outbound', sku: '', quantity: '', bin: '' })
+      setAiSuggestions(null)
     }
   }
   
@@ -145,6 +157,145 @@ export default function Home() {
     }
   }
   
+  // AI Functions
+  async function getAiBinSuggestion() {
+    if (!newOrder.sku || !newOrder.order_id) {
+      showMessage('error', 'Please enter SKU and Order ID first')
+      return
+    }
+    
+    setAiLoading(true)
+    setAiSuggestions(null)
+    
+    try {
+      const { data: availableBins } = await supabase
+        .from('inventory')
+        .select('bin, quantity, sku, description')
+        .eq('sku', newOrder.sku.toUpperCase())
+        .gt('quantity', 0)
+      
+      if (!availableBins || availableBins.length === 0) {
+        setAiSuggestions({ error: 'No stock available for this SKU' })
+        setAiLoading(false)
+        return
+      }
+      
+      const response = await fetch('/api/ai/suggest-bin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sku: newOrder.sku.toUpperCase(),
+          quantity: parseInt(newOrder.quantity),
+          orderId: newOrder.order_id.toUpperCase(),
+          customer: newOrder.customer,
+          availableBins: availableBins
+        })
+      })
+      
+      const suggestion = await response.json()
+      setAiSuggestions(suggestion)
+      
+      if (suggestion.recommendedBin) {
+        setNewOrder(prev => ({ ...prev, bin: suggestion.recommendedBin }))
+      }
+      
+    } catch (error) {
+      console.error('AI suggestion error:', error)
+      setAiSuggestions({ error: 'Failed to get AI suggestion' })
+    } finally {
+      setAiLoading(false)
+    }
+  }
+  
+  async function optimizePickingWave() {
+    setAiLoading(true)
+    
+    try {
+      const { data: pendingOrders } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('status', 'Open')
+        .eq('type', 'Outbound')
+      
+      const { data: allBins } = await supabase.from('bins').select('*')
+      
+      const response = await fetch('/api/ai/picking-optimization', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orders: pendingOrders || [],
+          pickingZones: allBins || [],
+          currentTime: new Date().toISOString(),
+          workerCount: 3
+        })
+      })
+      
+      const optimization = await response.json()
+      setPickingOptimization(optimization)
+      
+    } catch (error) {
+      console.error('Optimization error:', error)
+    } finally {
+      setAiLoading(false)
+    }
+  }
+  
+  async function runInventoryAudit() {
+    setAiLoading(true)
+    
+    try {
+      const response = await fetch('/api/ai/inventory-audit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          inventory: inventory.slice(0, 100),
+          orders: orders.filter(o => o.status === 'Open'),
+          bins: bins
+        })
+      })
+      
+      const audit = await response.json()
+      setInventoryAudit(audit)
+      
+    } catch (error) {
+      console.error('Audit error:', error)
+    } finally {
+      setAiLoading(false)
+    }
+  }
+  
+  async function sendChatMessage() {
+    if (!chatPrompt.trim()) return
+    
+    setChatLoading(true)
+    setChatResponse('')
+    
+    try {
+      const response = await fetch('/api/ai/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: chatPrompt,
+          context: {
+            totalSKUs: inventory.length,
+            totalQuantity: inventory.reduce((sum, i) => sum + i.quantity, 0),
+            activeOrders: orders.filter(o => o.status === 'Open').length,
+            openTasks: 0
+          }
+        })
+      })
+      
+      const data = await response.json()
+      setChatResponse(data.response || 'No response from AI')
+      setChatPrompt('')
+      
+    } catch (error) {
+      setChatResponse('Error connecting to AI service')
+    } finally {
+      setChatLoading(false)
+    }
+  }
+  
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -158,7 +309,6 @@ export default function Home() {
   
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Toast Message */}
       {message && (
         <div className={`fixed top-4 right-4 z-50 px-4 py-2 rounded-lg shadow-lg text-sm ${
           message.type === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
@@ -167,7 +317,6 @@ export default function Home() {
         </div>
       )}
       
-      {/* Header */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
@@ -175,7 +324,7 @@ export default function Home() {
               <span className="text-2xl">🏭</span>
               <div>
                 <h1 className="text-xl font-bold text-gray-900">Warehouse OS</h1>
-                <p className="text-xs text-gray-500">Connected to Supabase ✅</p>
+                <p className="text-xs text-gray-500">AI-Powered by Gemini 1.5 Flash</p>
               </div>
             </div>
             <div className="text-sm text-gray-500">
@@ -185,16 +334,13 @@ export default function Home() {
         </div>
       </header>
       
-      {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 py-6">
-        {/* Tabs */}
         <div className="flex gap-2 mb-6 border-b border-gray-200">
           <button onClick={() => setActiveTab('inventory')} className={`px-4 py-2 font-medium transition-all ${activeTab === 'inventory' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700'}`}>📦 Inventory ({inventory.length})</button>
           <button onClick={() => setActiveTab('bins')} className={`px-4 py-2 font-medium transition-all ${activeTab === 'bins' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700'}`}>🗄️ Bins ({bins.length})</button>
           <button onClick={() => setActiveTab('orders')} className={`px-4 py-2 font-medium transition-all ${activeTab === 'orders' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700'}`}>📝 Orders ({orders.length})</button>
         </div>
         
-        {/* Inventory Tab */}
         {activeTab === 'inventory' && (
           <div className="space-y-6">
             <div className="bg-white rounded-lg border border-gray-200 p-4">
@@ -209,6 +355,33 @@ export default function Home() {
                 </select>
               </div>
               <button onClick={addProduct} className="mt-3 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium">+ Add Product</button>
+            </div>
+            
+            {/* AI Inventory Audit Button */}
+            <div className="bg-gradient-to-r from-emerald-50 to-teal-50 rounded-lg border border-emerald-200 p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <BarChart3 className="w-5 h-5 text-emerald-600" />
+                  <h3 className="font-semibold text-emerald-900">AI Inventory Audit</h3>
+                </div>
+                <button onClick={runInventoryAudit} disabled={aiLoading} className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
+                  {aiLoading ? 'Analyzing...' : 'Run Audit'}
+                </button>
+              </div>
+              
+              {inventoryAudit && (
+                <div className="mt-3 space-y-2">
+                  {inventoryAudit.summary?.lowStockItems?.length > 0 && (
+                    <div className="bg-yellow-50 p-2 rounded text-sm">
+                      <AlertCircle className="w-4 h-4 inline text-yellow-600 mr-1" />
+                      Low Stock: {inventoryAudit.summary.lowStockItems.join(', ')}
+                    </div>
+                  )}
+                  {inventoryAudit.recommendations?.map((rec: string, i: number) => (
+                    <div key={i} className="text-sm text-gray-700">💡 {rec}</div>
+                  ))}
+                </div>
+              )}
             </div>
             
             <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
@@ -232,13 +405,12 @@ export default function Home() {
           </div>
         )}
         
-        {/* Bins Tab */}
         {activeTab === 'bins' && (
           <div className="space-y-6">
             <div className="bg-white rounded-lg border border-gray-200 p-4">
               <h2 className="font-semibold mb-3">Add New Bin</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <input type="text" placeholder="Bin Code (e.g., A-01-01)" className="border border-gray-300 rounded-lg px-3 py-2 text-sm" value={newBin.bin_code} onChange={(e) => setNewBin({ ...newBin, bin_code: e.target.value })} />
+                <input type="text" placeholder="Bin Code" className="border border-gray-300 rounded-lg px-3 py-2 text-sm" value={newBin.bin_code} onChange={(e) => setNewBin({ ...newBin, bin_code: e.target.value })} />
                 <input type="text" placeholder="Zone" className="border border-gray-300 rounded-lg px-3 py-2 text-sm" value={newBin.zone} onChange={(e) => setNewBin({ ...newBin, zone: e.target.value })} />
               </div>
               <button onClick={addBin} className="mt-3 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium">+ Add Bin</button>
@@ -255,7 +427,6 @@ export default function Home() {
           </div>
         )}
         
-        {/* Orders Tab */}
         {activeTab === 'orders' && (
           <div className="space-y-6">
             <div className="bg-white rounded-lg border border-gray-200 p-4">
@@ -274,31 +445,29 @@ export default function Home() {
               </div>
               <button onClick={addOrder} className="mt-3 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium">+ Create Order</button>
             </div>
-            <div className="space-y-2">
-              {orders.map(order => (
-                <div key={order.id} className="bg-white rounded-lg border border-gray-200 p-4">
-                  <div className="flex items-center justify-between flex-wrap gap-3">
-                    <div>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-mono font-bold">{order.order_id}</span>
-                        <span className={`text-xs px-2 py-0.5 rounded-full ${order.type === 'Inbound' ? 'bg-green-100 text-green-800' : order.type === 'Outbound' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'}`}>{order.type}</span>
-                        <span className={`text-xs px-2 py-0.5 rounded-full ${order.status === 'Open' ? 'bg-yellow-100 text-yellow-800' : order.status === 'In Transit' ? 'bg-purple-100 text-purple-800' : 'bg-green-100 text-green-800'}`}>{order.status}</span>
-                      </div>
-                      <div className="text-sm mt-1"><span className="font-medium">{order.customer}</span> - {order.sku} x {order.quantity}</div>
-                      <div className="text-xs text-gray-500 mt-1">Bin: {order.bin}</div>
-                    </div>
-                    <div className="flex gap-2">
-                      {order.status === 'Open' && <button onClick={() => updateOrderStatus(order.order_id, 'In Transit')} className="text-xs bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded">Start Transit</button>}
-                      {order.status === 'In Transit' && <button onClick={() => updateOrderStatus(order.order_id, 'Closed')} className="text-xs bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded">Complete</button>}
-                      <button onClick={() => deleteItem('orders', order.id, order.order_id)} className="text-red-500 hover:text-red-700 text-xs px-3 py-1">Delete</button>
-                    </div>
-                  </div>
+            
+            {/* AI Smart Bin Suggestion Panel */}
+            <div className="p-4 bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg border border-purple-200">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-5 h-5 text-purple-600" />
+                  <h3 className="font-semibold text-purple-900">AI Smart Bin Picker</h3>
+                  <span className="text-xs bg-purple-200 text-purple-800 px-2 py-0.5 rounded-full">Gemini 1.5 Flash</span>
                 </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
+                <button onClick={() => setShowAiPanel(!showAiPanel)} className="text-xs text-purple-600 hover:text-purple-800">{showAiPanel ? 'Hide' : 'Show'}</button>
+              </div>
+              
+              {showAiPanel && (
+                <div className="space-y-3">
+                  <div className="text-sm text-gray-600">
+                    Let AI recommend the optimal bin based on stock availability, pick efficiency, and FIFO compliance.
+                  </div>
+                  
+                  {newOrder.sku && newOrder.order_id && newOrder.type === 'Outbound' && (
+                    <button onClick={getAiBinSuggestion} disabled={aiLoading} className="w-full bg-purple-600 hover:bg-purple-700 text-white py-2 rounded-lg text-sm font-medium transition flex items-center justify-center gap-2">
+                      {aiLoading ? <>⏳ Analyzing...</> : <><Sparkles className="w-4 h-4" /> Get AI Bin Recommendation</>}
+                    </button>
+                  )}
+                  
+                  {aiSuggestions && !aiSuggestions.error && (
+                    <div className="bg-white rounded-lg p-3 border border-purple-100 space-y-
