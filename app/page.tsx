@@ -566,3 +566,4 @@ export default function Home() {
     </div>
   )
 }
+Add Gemini AI features - Smart bin picking, wave optimization, inventory audit, and chat assistant
